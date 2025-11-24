@@ -36,6 +36,122 @@
 
 <script>
 //Your code goes here 
+	// Draggable items using pointer events
+(() => {
+  const container = document.querySelector('.items');
+  if (!container) return;
+
+  const items = Array.from(container.querySelectorAll('.item'));
+  if (items.length === 0) return;
+
+  // Convert each item to absolute position while preserving visual layout
+  const containerRect = container.getBoundingClientRect();
+
+  items.forEach(it => {
+    const r = it.getBoundingClientRect();
+
+    // compute position relative to container (account for scrolling)
+    const left = r.left - containerRect.left + container.scrollLeft;
+    const top = r.top - containerRect.top + container.scrollTop;
+
+    // apply absolute positioning
+    it.style.position = 'absolute';
+    it.style.left = Math.round(left) + 'px';
+    it.style.top = Math.round(top) + 'px';
+    // ensure z-index and a short transition for nice placement when released
+    it.style.zIndex = 1;
+    it.style.transition = 'left 0.06s linear, top 0.06s linear';
+    // prevent text selection while dragging
+    it.style.userSelect = 'none';
+    it.style.touchAction = 'none'; // allow pointer events
+  });
+
+  // re-calc container rect on demand (in case of layout changes)
+  const getContainerRect = () => container.getBoundingClientRect();
+
+  let dragging = null;
+  let startPointer = {x:0, y:0};
+  let startPos = {left:0, top:0};
+  const dragThreshold = 3; // small threshold to treat as drag vs click
+
+  function onPointerDown(e) {
+    const target = e.target.closest('.item');
+    if (!target || !container.contains(target)) return;
+
+    // capture pointer events on the element
+    target.setPointerCapture(e.pointerId);
+
+    dragging = {
+      el: target,
+      id: e.pointerId,
+      moved: false
+    };
+
+    const left = parseFloat(target.style.left) || 0;
+    const top = parseFloat(target.style.top) || 0;
+    startPos.left = left;
+    startPos.top = top;
+    startPointer.x = e.clientX;
+    startPointer.y = e.clientY;
+
+    // while dragging, disable transition for immediate follow
+    target.style.transition = 'none';
+    target.style.zIndex = 1000;
+  }
+
+  function onPointerMove(e) {
+    if (!dragging || e.pointerId !== dragging.id) return;
+    e.preventDefault();
+
+    const dx = e.clientX - startPointer.x;
+    const dy = e.clientY - startPointer.y;
+    if (!dragging.moved && Math.hypot(dx, dy) > dragThreshold) dragging.moved = true;
+
+    // calculate new position and clamp to container
+    const rect = getContainerRect();
+    const el = dragging.el;
+    const maxLeft = container.clientWidth - el.offsetWidth;
+    const maxTop  = container.clientHeight - el.offsetHeight;
+
+    let newLeft = startPos.left + dx;
+    let newTop  = startPos.top + dy;
+
+    if (newLeft < 0) newLeft = 0;
+    if (newTop < 0) newTop = 0;
+    if (newLeft > maxLeft) newLeft = maxLeft;
+    if (newTop > maxTop) newTop = maxTop;
+
+    el.style.left = Math.round(newLeft) + 'px';
+    el.style.top  = Math.round(newTop) + 'px';
+  }
+
+  function onPointerUp(e) {
+    if (!dragging || e.pointerId !== dragging.id) return;
+    const el = dragging.el;
+
+    // release pointer capture
+    try { el.releasePointerCapture(e.pointerId); } catch(_) {}
+
+    // restore transition and z-index
+    el.style.transition = 'left 0.06s linear, top 0.06s linear';
+    el.style.zIndex = 1;
+
+    // if user didn't move (a simple click), we just leave it where it was
+    dragging = null;
+  }
+
+  // attach listeners
+  document.addEventListener('pointerdown', onPointerDown, {passive: false});
+  document.addEventListener('pointermove', onPointerMove, {passive: false});
+  document.addEventListener('pointerup', onPointerUp, {passive: false});
+  document.addEventListener('pointercancel', onPointerUp, {passive: false});
+
+  // Optional: keep positions if container is resized - recalibrate basis (no complex rescaling done)
+  window.addEventListener('resize', () => {
+    // recompute container rect so further drags use correct bounds
+  });
+})();
+
 </script>
 
   </body>
